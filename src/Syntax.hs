@@ -8,21 +8,23 @@ import qualified Data.Text as Text
 import Data.Vector (Vector)
 import qualified Data.Vector as Vec
 
-type Vec = Vector
+type Vec =
+  Vector
 
 -- | A line/column position for error reporting.
-data Pos
-  = Pos (Int, Int)
+-- TODO(mrkgnao): move to a byte offset-based representation
+data SrcPos
+  = SrcPos (Int, Int)
   deriving (Show)
 
 -- | A source location
 data SrcLoc
-  = SrcLoc Text Pos Pos
+  = SrcLoc Text SrcPos SrcPos
   deriving (Show)
 
-invalid :: Pos
+invalid :: SrcPos
 invalid =
-  Pos (-1, -1)
+  SrcPos (-1, -1)
 
 -- | The source location for an inferred variable.
 inferred :: SrcLoc
@@ -37,28 +39,29 @@ dummy =
 -- Vars
 
 newtype Var
-  = MkVar (Text)
+  = MkVar Text
   deriving (Show)
 
 type Vars =
   Vec Var
 
 newtype TyVar
-  = MkTyVar (Text)
+  = MkTyVar Text
   deriving (Show)
 
-type TyVars = Vec TyVar
+type TyVars =
+  Vec TyVar
 
 newtype FnVar
-  = MkFnVar (Text)
+  = MkFnVar Text
   deriving (Show)
 
 newtype ProvVar
-  = MkProvVar (Text)
+  = MkProvVar Text
   deriving (Show)
 
 newtype StructVar
-  = MkStructVar (Text)
+  = MkStructVar Text
   deriving (Show)
 
 data Owned
@@ -83,7 +86,8 @@ data SubtypeModality
 type Field =
   Text
 
-type TypedField = (Field, Ty)
+type TypedField =
+  (Field, Ty)
 
 data PathEntry
   = Field Field
@@ -161,9 +165,12 @@ data Bound
 type Bounds =
   Vec Bound
 
-data Param = Param Var Ty deriving (Show)
+data Param
+  = Param Var Ty
+  deriving (Show)
 
-type Params = Vec Param
+type Params =
+  Vec Param
 
 data BaseTy
   = Bool
@@ -197,16 +204,19 @@ data Env
   | EnvOf Var
   deriving (Show)
 
-type Envs = Vec Env
+type Envs =
+  Vec Env
 
 newtype VarEnv
   = VarEnv (Vec Param)
   deriving (Show)
 
-type Gamma = VarEnv
+type Gamma =
+  VarEnv
 
 emptyGamma :: VarEnv
-emptyGamma = VarEnv []
+emptyGamma =
+  VarEnv []
 
 type Tys =
   Vec Ty
@@ -299,7 +309,8 @@ data Exp
   = Exp SrcLoc PreExp
   deriving (Show)
 
-type Exps = Vec Exp
+type Exps =
+  Vec Exp
 
 data Value
   = ValDead
@@ -310,7 +321,9 @@ data Value
   | ValPtr Owned Place
   deriving (Show)
 
-newtype Store = Store (Vec (Var, Value)) deriving (Show)
+newtype Store
+  = Store (Vec (Var, Value))
+  deriving (Show)
 
 data FnDef
   = FnDef
@@ -341,36 +354,55 @@ data StructDef
 
 data GlobalDef
   = DefFn FnDef
-  | DefRec RecStructDef
-  | DefTup TupStructDef
+  | DefRecStruct RecStructDef
+  | DefTupStruct TupStructDef
   deriving (Show)
 
-newtype GlobalEnv = GlobalEnv (Vec GlobalDef) deriving (Show)
+newtype GlobalEnv
+  = GlobalEnv (Vec GlobalDef)
+  deriving (Show)
 
-type Sigma = GlobalEnv
+type Sigma =
+  GlobalEnv
 
 emptySigma :: GlobalEnv
-emptySigma = GlobalEnv []
+emptySigma =
+  GlobalEnv []
 
-data SubTy = SubTy ProvVar ProvVar deriving (Show)
+data SubTy
+  = SubTy ProvVar ProvVar
+  deriving (Show)
 
-data TyVarEnv = TyVarEnv EnvVars Provs TyVars (Vec SubTy) deriving (Show)
+data TyVarEnv
+  = TyVarEnv EnvVars Provs TyVars (Vec SubTy)
+  deriving (Show)
 
-type Delta = TyVarEnv
+type Delta =
+  TyVarEnv
 
 emptyDelta :: TyVarEnv
-emptyDelta = TyVarEnv [] [] [] []
+emptyDelta =
+  TyVarEnv [] [] [] []
 
-newtype LoanEnv = LoanEnv (Vec (Prov, Loans)) deriving (Show)
+newtype LoanEnv
+  = LoanEnv (Vec (Prov, Loans))
+  deriving (Show)
 
-type Ell = LoanEnv
+type Ell =
+  LoanEnv
 
 emptyEll :: LoanEnv
-emptyEll = LoanEnv []
+emptyEll =
+  LoanEnv []
 
-newtype PlaceEnv = PlaceEnv (Vec (Place, Ty)) deriving (Show)
+newtype PlaceEnv
+  = PlaceEnv (Vec (Place, Ty))
+  deriving (Show)
 
-data StructKind = Rec | Tup deriving (Show)
+data StructKind
+  = Rec
+  | Tup
+  deriving (Show)
 
 data TcErr
   = -- | expected, found
@@ -416,13 +448,8 @@ data TcErr
   | InvalidLoan Owned PlaceExp
   | InvalidArrayLen Ty Int
   | InvalidOperationOnType Path Ty
-  | InvalidOperationOnTypeEP
-      ExpPath
-      Ty
-  | DuplicateFieldsInStructDef
-      StructVar
-      TypedField
-      TypedField
+  | InvalidOperationOnTypeEP ExpPath Ty
+  | DuplicateFieldsInStructDef StructVar TypedField TypedField
   | -- | for struct, because of Ty
     InvalidCopyImpl StructVar Ty
   | UnboundPlace Place
