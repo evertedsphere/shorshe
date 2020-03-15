@@ -1,0 +1,7 @@
+max_width = 70
+comment_width = 70
+tab_spaces = 2
+format_strings = true
+merge_imports = false
+overflow_delimited_expr = true
+wrap_comments = true

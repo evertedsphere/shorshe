@@ -1,0 +1,3 @@
+[submodule "oxide/.rien"]
+	path = oxide/.rien
+	url = https://github.com/mrkgnao/rien
