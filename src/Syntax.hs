@@ -1,8 +1,15 @@
+{-# LANGUAGE DeriveAnyClass #-}
+{-# LANGUAGE DeriveGeneric #-}
+{-# LANGUAGE DerivingStrategies #-}
+{-# LANGUAGE GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Syntax where
 
+import Control.Lens ((<&>))
 import Data.Text (Text)
 import qualified Data.Text as Text
 import Data.Vector (Vector)
@@ -15,12 +22,12 @@ type Vec =
 -- TODO(mrkgnao): move to a byte offset-based representation
 data SrcPos
   = SrcPos (Int, Int)
-  deriving (Show)
+  deriving stock (Show)
 
 -- | A source location
 data SrcLoc
   = SrcLoc Text SrcPos SrcPos
-  deriving (Show)
+  deriving stock (Show)
 
 invalid :: SrcPos
 invalid =
@@ -40,38 +47,38 @@ dummy =
 
 newtype Var
   = MkVar Text
-  deriving (Show)
+  deriving stock (Show)
 
 type Vars =
   Vec Var
 
 newtype TyVar
   = MkTyVar Text
-  deriving (Show)
+  deriving stock (Show)
 
 type TyVars =
   Vec TyVar
 
 newtype FnVar
   = MkFnVar Text
-  deriving (Show)
+  deriving stock (Show)
 
 newtype ProvVar
   = MkProvVar Text
-  deriving (Show)
+  deriving stock (Show)
 
 newtype StructVar
   = MkStructVar Text
-  deriving (Show)
+  deriving stock (Show)
 
 data Owned
   = Shared
   | Unique
-  deriving (Show)
+  deriving stock (Show)
 
 data EnvVar
   = MkEnvVar Owned Text
-  deriving (Show)
+  deriving stock (Show)
 
 type EnvVars =
   Vec EnvVar
@@ -81,7 +88,7 @@ type EnvVars =
 data SubtypeModality
   = Combine
   | Override
-  deriving (Show)
+  deriving stock (Show)
 
 type Field =
   Text
@@ -92,19 +99,19 @@ type TypedField =
 data PathEntry
   = Field Field
   | Index Int
-  deriving (Show)
+  deriving stock (Show)
 
 newtype Path
   = Path (Vec PathEntry)
-  deriving (Show)
+  deriving stock (Show)
 
 data PrePlace
   = PrePlace Var Path
-  deriving (Show)
+  deriving stock (Show)
 
 data Place
   = Place SrcLoc PrePlace
-  deriving (Show)
+  deriving stock (Show)
 
 type Places =
   Vec Place
@@ -115,19 +122,20 @@ data ExpPathEntry
   = ExpField Field
   | ExpIndex Int
   | ExpDeref
-  deriving (Show)
+  deriving stock (Show)
 
 newtype ExpPath
   = ExpPath (Vec ExpPathEntry)
-  deriving (Show)
+  deriving stock (Show)
 
 data PrePlaceExp
   = PrePlaceExp Var ExpPath
-  deriving (Show)
+  deriving stock (Show)
 
+-- | A place expression.
 data PlaceExp
   = PlaceExp SrcLoc PrePlaceExp
-  deriving (Show)
+  deriving stock (Show)
 
 type PlaceExps =
   Vec PlaceExp
@@ -144,30 +152,57 @@ exprRootOf (PlaceExp _ (PrePlaceExp v _)) = v
 exprPathOf :: PlaceExp -> ExpPath
 exprPathOf (PlaceExp _ (PrePlaceExp _ p)) = p
 
+toExpPathEntry :: PathEntry -> ExpPathEntry
+toExpPathEntry = \case
+  Field f -> ExpField f
+  Index i -> ExpIndex i
+
+toExpPath :: Path -> ExpPath
+toExpPath (Path p) = ExpPath (toExpPathEntry <$> p)
+
+toPlaceExp :: Place -> PlaceExp
+toPlaceExp (Place loc (PrePlace root path)) =
+  PlaceExp loc (PrePlaceExp root (toExpPath path))
+
+-- | Convers expression path entries to the corresponding path entry forms.
+toPathEntry :: ExpPathEntry -> Maybe PathEntry
+toPathEntry = \case
+  ExpField f -> Just (Field f)
+  ExpIndex i -> Just (Index i)
+  ExpDeref -> Nothing
+
+toPath :: ExpPath -> Maybe Path
+toPath (ExpPath ep) = foldr go (Just (Path [])) ep
+  where
+    go expEntry acc = do
+      Path path <- acc
+      entry <- toPathEntry expEntry
+      pure (Path (Vec.cons entry path))
+
 data Loan
   = Loan Owned PlaceExp
-  deriving (Show)
+  deriving stock (Show)
 
 type Loans =
   Vec Loan
 
 data Prov
   = Prov SrcLoc ProvVar
-  deriving (Show)
+  deriving stock (Show)
 
 type Provs =
   Vec Prov
 
 data Bound
   = Bound Prov Prov
-  deriving (Show)
+  deriving stock (Show)
 
 type Bounds =
   Vec Bound
 
 data Param
   = Param Var Ty
-  deriving (Show)
+  deriving stock (Show)
 
 type Params =
   Vec Param
@@ -176,7 +211,7 @@ data BaseTy
   = Bool
   | U32
   | Unit
-  deriving (Show)
+  deriving stock (Show)
 
 data PreTy
   = TyAny
@@ -191,25 +226,25 @@ data PreTy
   | TyTup Tys
   | TyStruct StructVar Provs Tys (Maybe Ty)
   | TyUninit Ty
-  deriving (Show)
+  deriving stock (Show)
 
 data Ty
   = Ty SrcLoc PreTy
-  deriving (Show)
+  deriving stock (Show)
 
 data Env
   = EnvUnboxed
   | EnvVar EnvVar
   | Env VarEnv
   | EnvOf Var
-  deriving (Show)
+  deriving stock (Show)
 
 type Envs =
   Vec Env
 
 newtype VarEnv
   = VarEnv (Vec Param)
-  deriving (Show)
+  deriving stock (Show)
 
 type Gamma =
   VarEnv
@@ -227,18 +262,18 @@ data PreTyCtx
   | CtxTagged StructVar Provs Tys TyCtx
   | CtxRec (Vec (Field, TyCtx))
   | CtxTup (Vec TyCtx)
-  deriving (Show)
+  deriving stock (Show)
 
 data TyCtx
   = TyCtx SrcLoc PreTyCtx
-  deriving (Show)
+  deriving stock (Show)
 
 data Prim
   = PrimTrue
   | PrimFalse
   | PrimUnit
   | PrimNum Int
-  deriving (Show)
+  deriving stock (Show)
 
 data Binop
   = -- | addition
@@ -277,7 +312,7 @@ data Binop
     Ge
   | -- | greater than
     Gt
-  deriving (Show)
+  deriving stock (Show)
 
 data PreExp
   = ExpPrim Prim
@@ -303,11 +338,11 @@ data PreExp
   | ExpRecStruct StructVar Provs Tys (Vec (Field, Exp))
   | ExpTupStruct StructVar Provs Tys Exps
   | ExpPtr Owned Place
-  deriving (Show)
+  deriving stock (Show)
 
 data Exp
   = Exp SrcLoc PreExp
-  deriving (Show)
+  deriving stock (Show)
 
 type Exps =
   Vec Exp
@@ -319,11 +354,11 @@ data Value
   | ValTup (Vec Value)
   | ValArr (Vec Value)
   | ValPtr Owned Place
-  deriving (Show)
+  deriving stock (Show)
 
 newtype Store
   = Store (Vec (Var, Value))
-  deriving (Show)
+  deriving stock (Show)
 
 data FnDef
   = FnDef
@@ -337,30 +372,30 @@ data FnDef
         _fnDefBounds :: Bounds,
         _fnDefBody :: Exp
       }
-  deriving (Show)
+  deriving stock (Show)
 
 data RecStructDef
   = RecStructDef Bool StructVar Provs TyVars (Vec TypedField)
-  deriving (Show)
+  deriving stock (Show)
 
 data TupStructDef
   = TupStructDef Bool StructVar Provs TyVars Tys
-  deriving (Show)
+  deriving stock (Show)
 
 data StructDef
   = StructRec RecStructDef
   | StructTup TupStructDef
-  deriving (Show)
+  deriving stock (Show)
 
 data GlobalDef
   = DefFn FnDef
   | DefRecStruct RecStructDef
   | DefTupStruct TupStructDef
-  deriving (Show)
+  deriving stock (Show)
 
 newtype GlobalEnv
   = GlobalEnv (Vec GlobalDef)
-  deriving (Show)
+  deriving stock (Show)
 
 type Sigma =
   GlobalEnv
@@ -371,11 +406,11 @@ emptySigma =
 
 data SubTy
   = SubTy ProvVar ProvVar
-  deriving (Show)
+  deriving stock (Show)
 
 data TyVarEnv
   = TyVarEnv EnvVars Provs TyVars (Vec SubTy)
-  deriving (Show)
+  deriving stock (Show)
 
 type Delta =
   TyVarEnv
@@ -386,7 +421,7 @@ emptyDelta =
 
 newtype LoanEnv
   = LoanEnv (Vec (Prov, Loans))
-  deriving (Show)
+  deriving stock (Show)
 
 type Ell =
   LoanEnv
@@ -397,12 +432,12 @@ emptyEll =
 
 newtype PlaceEnv
   = PlaceEnv (Vec (Place, Ty))
-  deriving (Show)
+  deriving stock (Show)
 
 data StructKind
   = Rec
   | Tup
-  deriving (Show)
+  deriving stock (Show)
 
 data TcErr
   = -- | expected, found
@@ -465,4 +500,4 @@ data TcErr
   | TysArityMismatch Text Tys Tys
   | TyArityMismatch Text Tys TyVars
   | ExpArityMismatch Text Exps Tys
-  deriving (Show)
+  deriving stock (Show)
