@@ -23,6 +23,8 @@ executable shorshe
   build-depends:       base >=4.12 && <4.13, 
                        text, 
                        vector, 
+                       unordered-containers,
+                       hashable,
                        Cabal, 
                        generic-lens, 
                        lens
