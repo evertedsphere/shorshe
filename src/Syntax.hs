@@ -10,6 +10,7 @@
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE OverloadedLists #-}
 {-# LANGUAGE OverloadedStrings #-}
+{-# LANGUAGE StandaloneDeriving #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeSynonymInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
@@ -17,7 +18,10 @@
 
 module Syntax where
 
+import Control.Applicative
 import Control.Lens
+import Control.Monad.Except
+import Data.Foldable
 import Data.HashMap.Strict (HashMap)
 import qualified Data.HashMap.Strict as HashMap
 import Data.HashSet (HashSet)
@@ -130,7 +134,7 @@ data PathEntry
 newtype Path
   = Path (Vec PathEntry)
   deriving stock (Show, Eq, Generic)
-  deriving newtype (Hashable)
+  deriving newtype (Hashable, IsList)
 
 data PrePlace
   = PrePlace Var Path
@@ -332,10 +336,10 @@ isSized (Ty _ ty) = case ty of
   TySlice _ -> False
   _ -> True
 
-class InitCk a where
+class Initck a where
   isInit :: a -> Bool
 
-instance InitCk Ty where
+instance Initck Ty where
   isInit (Ty _ typ) = case typ of
     TyAny -> True
     TyInfer -> True
@@ -352,10 +356,10 @@ instance InitCk Ty where
     TyStruct _ _ tys Nothing -> isInit tys
     TyUninit {} -> False
 
-instance InitCk Tys where
+instance Initck Tys where
   isInit = all isInit
 
-instance InitCk Env where
+instance Initck Env where
   isInit = \case
     EnvUnboxed -> True
     EnvVar {} -> True
@@ -564,6 +568,7 @@ emptyDelta =
 newtype LoanEnv
   = LoanEnv (Vec (Prov, Loans))
   deriving stock (Show)
+  deriving newtype (Semigroup, Monoid)
 
 type Ell =
   LoanEnv
@@ -615,13 +620,37 @@ instance Eq LoanEnv where
         unorderedEq (loanEnvLookup' ell prov) (loanEnvLookup' ell' prov)
       provs = let LoanEnv e = ell in Vec.map fst e
 
-filterDom :: LoanEnv -> Provs -> LoanEnv
-filterDom (LoanEnv ell) (Provs provs) =
+loanEnvFilterDom :: LoanEnv -> Provs -> LoanEnv
+loanEnvFilterDom (LoanEnv ell) (Provs provs) =
   let provVars = fmap (\(Prov _ p) -> p) provs
    in LoanEnv (Vec.filter (\(Prov _ p, _) -> p `Vec.elem` provVars) ell)
 
--- TODO cant be bothered doing the rest of these, postpone until i need them
+loanEnvInclude :: Prov -> Loans -> LoanEnv -> LoanEnv
+loanEnvInclude prov@(Prov _ var) loans (LoanEnv ell) =
+  LoanEnv
+    ( ell
+        & Vec.filter (\(Prov _ var', _) -> var /= var')
+        & Vec.cons (prov, loans)
+    )
 
+loanEnvIncludeAll :: Provs -> Loans -> LoanEnv -> LoanEnv
+loanEnvIncludeAll (Provs provs) loans (LoanEnv ell) =
+  LoanEnv
+    ( Vec.filter
+        ( \(prov, _) ->
+            provs
+              & Vec.elem prov
+              & not
+        )
+        ell
+        Vec.++ entries
+    )
+  where
+    entries = provs <&> (\prov -> (prov, loans))
+
+-- loanEnvExclude ::
+
+-- | Useful for pretty-printing in ownership safety
 newtype PlaceEnv
   = PlaceEnv (Vec (Place, Ty))
   deriving stock (Show, Eq, Generic)
@@ -693,3 +722,19 @@ data TcErr
   | TyArityMismatch Text Tys TyVars
   | ExpArityMismatch Text Exps Tys
   deriving stock (Show, Eq, Generic)
+
+newtype TcT m a = TcT {unTcT :: ExceptT TcErr m a}
+  deriving newtype
+    ( Functor,
+      Applicative,
+      Monad,
+      MonadError TcErr
+    )
+
+type Tc = TcT Identity
+
+combineEnvs :: Monad m => Text -> Envs -> EnvVars -> TcT m (Vec (Env, EnvVar))
+combineEnvs ctx e e' =
+  if length e /= length e'
+    then throwError (EnvArityMismatch ctx e e')
+    else pure (Vec.zip e e')
