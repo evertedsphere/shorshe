@@ -1,0 +1,14 @@
+
+A collection of papers in sequence for reference in the development of this type 
+theory.
+
+* Linear-Dependent Type Theories
+  
+  1. Mcbride, Conor. ~I Got Plenty o' Nuttin'~
+     #+URL: https://personal.cis.strath.ac.uk/conor.mcbride/PlentyO-CR.pdf
+     #+SIG: rizoid
+     
+     a. Tomas Petricek, Dominic A. Orchard, and Alan Mycroft. ~Coeffects: a~ 
+        ~calculus ofcontext-dependent computation~
+        #+URL: https://www.cs.kent.ac.uk/people/staff/dao7/publ/coeffects-icfp14.pdf
+        #+SIG: rizoid
